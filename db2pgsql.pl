@@ -33,10 +33,16 @@ else { open FILEOUT, "> $opts{'f'}" . '.sql' }
 
 for my $f_table (@files) {
 
-    my $db = new Paradox "$f_table";
-    my @type = @{ $db->{field_type} };
-    my @len  = @{ $db->{field_length} };
-    my @name = @{ $db->{field_name} };
+    my $db        = new Paradox "$f_table";
+    my $code_page = &select_codepage( $db->{code_page} );
+    my @type      = @{ $db->{field_type} };
+    my @len       = @{ $db->{field_length} };
+    my @name      = @{ $db->{field_name} };
+
+    print "$code_page\n";
+    map { encode( "$opts{'d'}", decode( $code_page, $_ ) ) } @name
+      if ($code_page);
+
     my $tmp;
     my $num_f = scalar(@type);
     $f_table = substr( $f_table, 0, -3 );
@@ -111,23 +117,24 @@ for my $f_table (@files) {
 
             for ( my $i = 0 ; $i < $num_f ; $i++ ) {
 
-                if ( $type[$i] eq 0x01 ) {
+                if ( $type[$i] eq 0x01 || $type[$i] eq 0x0C ) {
 
                     if ( defined( $record_data[$i] ) ) {
-                        if ( $opts{'d'} eq 'cp1251' ) {
-
+                        unless ($code_page) {
                             $record_data[$i] =~
 s/\x09|\x0D|\x0A/'\\x'.sprintf ("%02X", unpack("C", $&))/ge;
                             $record_data[$i] =~ s/\\/\\\\/g;
+                            $record_data[$i] =
+                              encode( "$opts{'d'}", $record_data[$i] );
                         }
-                        else {
 
+                        else {
                             $record_data[$i] =~
 s/\x09|\x0D|\x0A/'\\x'.sprintf ("%02X", unpack("C", $&))/ge;
                             $record_data[$i] =~ s/\\/\\\\/g;
                             $record_data[$i] =
                               encode( "$opts{'d'}",
-                                decode( 'cp1251', $record_data[$i] ) );
+                                decode( $code_page, $record_data[$i] ) );
                         }
                     }
                     else { $record_data[$i] = '\N' }
@@ -141,28 +148,6 @@ s/\x09|\x0D|\x0A/'\\x'.sprintf ("%02X", unpack("C", $&))/ge;
                     else { $record_data[$i] = '\N'; }
                 }
 
-                elsif ( $type[$i] eq 0x0C ) {
-                    if ( defined( $record_data[$i] ) ) {
-
-                        if ( $opts{'d'} eq 'cp1251' ) {
-
-                            $record_data[$i] =~
-s/\x09|\x0D|\x0A/'\\x'.sprintf ("%02X", unpack("C", $&))/ge;
-                            $record_data[$i] =~ s/\\/\\\\/g;
-                        }
-                        else {
-                            $record_data[$i] =~
-s/\x09|\x0D|\x0A/'\\x'.sprintf ("%02X", unpack("C", $&))/ge;
-                            $record_data[$i] =~ s/\\/\\\\/g;
-                            $record_data[$i] =
-                              encode( "$opts{'d'}",
-                                decode( 'cp1251', $record_data[$i] ) );
-
-                        }
-                    }
-                    else { $record_data[$i] = '\N' }
-
-                }
                 elsif (( $type[$i] eq 0x04 )
                     or ( $type[$i] eq 0x06 )
                     or ( $type[$i] eq 0x03 ) )
@@ -175,6 +160,7 @@ s/\x09|\x0D|\x0A/'\\x'.sprintf ("%02X", unpack("C", $&))/ge;
 
             $sqlcommand = substr( $sqlcommand, 0, length($sqlcommand) - 1 );
             $sqlcommand .= "\n";
+            print $sqlcommand;
             if ( !$opts{'f'} ) {
                 $dbh->pg_putcopydata($sqlcommand);
 
@@ -204,7 +190,7 @@ sub basename {
 sub getoptions {
 
     getopt( 'sdmnlpf', \%opts );
-    unless ( %opts ) {
+    unless (%opts) {
         die "
     no parametres!!!\n
     -l login\n
@@ -214,9 +200,12 @@ sub getoptions {
     -f print sql commands in file (by default dbf converting in base directly) \n
                                          ";
     }
-
     unless ( defined $opts{'d'} ) { $opts{'d'} = 'cp1251' }
     unless ( defined $opts{'n'} ) { $opts{'n'} = &basename }
 
 }
 
+sub select_codepage {
+    my $codepage = shift;
+    return 'cp' . $codepage if ($codepage);
+}
