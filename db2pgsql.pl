@@ -120,21 +120,19 @@ for my $f_table (@files) {
                 if ( $type[$i] eq 0x01 || $type[$i] eq 0x0C ) {
 
                     if ( defined( $record_data[$i] ) ) {
+                        $record_data[$i] =~
+s/\x09|\x0D|\x0A/'\\x'.sprintf ("%02X", unpack("C", $&))/ge;
+                            $record_data[$i] =~ s/\\/\\\\/g;
+                        
                         unless ($code_page) {
-                            $record_data[$i] =~
-s/\x09|\x0D|\x0A/'\\x'.sprintf ("%02X", unpack("C", $&))/ge;
-                            $record_data[$i] =~ s/\\/\\\\/g;
-                            $record_data[$i] =
-                              encode( "$opts{'d'}", $record_data[$i] );
+                            $record_data[$i] = encode( "$opts{'d'}", $record_data[$i] ) if ($opts{'d'});
                         }
-
                         else {
-                            $record_data[$i] =~
-s/\x09|\x0D|\x0A/'\\x'.sprintf ("%02X", unpack("C", $&))/ge;
-                            $record_data[$i] =~ s/\\/\\\\/g;
-                            $record_data[$i] =
-                              encode( "$opts{'d'}",
-                                decode( $code_page, $record_data[$i] ) );
+                            if ($opts{'d'}) {$record_data[$i] = encode( "$opts{'d'}", decode( $code_page, $record_data[$i]))
+                            }
+                            else {
+								$record_data[$i] = decode( $code_page, $record_data[$i] );
+                            }
                         }
                     }
                     else { $record_data[$i] = '\N' }
@@ -200,7 +198,6 @@ sub getoptions {
     -f print sql commands in file (by default dbf converting in base directly) \n
                                          ";
     }
-    unless ( defined $opts{'d'} ) { $opts{'d'} = 'cp1251' }
     unless ( defined $opts{'n'} ) { $opts{'n'} = &basename }
 
 }
