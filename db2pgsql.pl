@@ -25,7 +25,6 @@ if ( !$opts{'f'} ) {
     $dbh->do("drop database $basename");
     $dbh->do("create database $basename");
     $dbh->disconnect();
-
     $dbh = DBI->connect( "DBI:Pg:dbname=$basename", "$login", "$password" )
       or die("Could't connect to database: $DBI:: errstr");
 }
@@ -39,9 +38,15 @@ for my $f_table (@files) {
     my @len       = @{ $db->{field_length} };
     my @name      = @{ $db->{field_name} };
 
-    print "$code_page\n";
-    map { encode( "$opts{'d'}", decode( $code_page, $_ ) ) } @name
-      if ($code_page);
+    if ($code_page) {
+        if ( $opts{'d'} ) {
+            map { encode( "$opts{'d'}", decode( $code_page, $_ ) ) } @name;
+        }
+        else {
+            map { decode( $code_page, $_ ) } @name;
+        }
+
+    }
 
     my $tmp;
     my $num_f = scalar(@type);
@@ -119,7 +124,7 @@ for my $f_table (@files) {
 
                 if ( $type[$i] eq 0x01 || $type[$i] eq 0x0C ) {
 
-                    if ( defined( $record_data[$i] ) ) {
+                    if ( $record_data[$i] ne '' ) {
                         $record_data[$i] =~
 s/\x09|\x0D|\x0A/'\\x'.sprintf ("%02X", unpack("C", $&))/ge;
                         $record_data[$i] =~ s/\\/\\\\/g;
@@ -164,7 +169,6 @@ s/\x09|\x0D|\x0A/'\\x'.sprintf ("%02X", unpack("C", $&))/ge;
 
             $sqlcommand = substr( $sqlcommand, 0, length($sqlcommand) - 1 );
             $sqlcommand .= "\n";
-            print $sqlcommand;
             if ( !$opts{'f'} ) {
                 $dbh->pg_putcopydata($sqlcommand);
 
