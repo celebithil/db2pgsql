@@ -14,14 +14,14 @@ my @files    = glob("*.[Dd][Bb]");
 my $basename = $opts{'n'};
 my $login    = $opts{'l'};
 my $password = $opts{'p'};
-my $dbh;
-my $sth;
+my ($dbh, $sth);
+my ($num_f, $code_page);
+my (@type, @len, @name);
 
 if ( !$opts{'f'} ) {
 
     $dbh = DBI->connect( "DBI:Pg:dbname=postgres", "$login", "$password" )
       or die("Could't connect to database: $DBI:: errstr");
-
     $dbh->do("drop database $basename");
     $dbh->do("create database $basename");
     $dbh->disconnect();
@@ -33,10 +33,10 @@ else { open FILEOUT, "> $opts{'f'}" . '.sql' }
 for my $f_table (@files) {
 
     my $db        = new Paradox "$f_table";
-    my $code_page = &select_codepage( $db->{code_page} );
-    my @type      = @{ $db->{field_type} };
-    my @len       = @{ $db->{field_length} };
-    my @name      = @{ $db->{field_name} };
+    $code_page = &select_codepage( $db->{code_page} );
+    @type      = @{ $db->{field_type} };
+    @len       = @{ $db->{field_length} };
+    @name      = @{ $db->{field_name} };
 
     if ($code_page) {
         if ( $opts{'d'} ) {
@@ -47,61 +47,10 @@ for my $f_table (@files) {
         }
 
     }
-
-    my $tmp;
-    my $num_f = scalar(@type);
+	
+    $num_f = scalar(@type);
     $f_table = substr( $f_table, 0, -3 );
-    my $num = $db->{all_records};
-
-    my $sqlcommand = "CREATE TABLE $f_table (";
-
-    for ( my $i = 0 ; $i < $num_f ; $i++ ) {
-
-        $sqlcommand .= '"' . $name[$i] . '"' . ' ';
-
-        if ( $type[$i] eq 0x01 ) {
-            $_ = 'char(' . $len[$i] . ')';
-        }
-
-        elsif ( $type[$i] eq 0x02 ) {
-            $_ = 'date';
-        }
-
-        elsif ( $type[$i] eq 0x0C ) {
-            $_ = 'text';
-        }
-
-        elsif ( $type[$i] eq 0x09 ) {
-            $_ = 'boolean';
-        }
-
-        elsif ( $type[$i] eq 0x03 ) {
-            $_ = 'smallint';
-        }
-
-        elsif ( $type[$i] eq 0x04 ) {
-            $_ = 'integer';
-        }
-
-        elsif ( $type[$i] eq 0x06 ) {
-            $_ = 'float';
-        }
-
-        elsif ( $type[$i] eq 0x14 ) {
-            $_ = 'time';
-
-        }
-
-        elsif ( $type[$i] eq 0x16 ) {
-            $_ = 'integer';
-
-        }
-
-        $sqlcommand .= $_ . ', ';
-
-    }
-    $sqlcommand = substr( $sqlcommand, 0, length($sqlcommand) - 2 );
-    $sqlcommand .= ');';
+	my $sqlcommand = &create_table ($f_table);
 
     if ( !$opts{'f'} ) {
         $sth = $dbh->prepare($sqlcommand);
@@ -118,57 +67,7 @@ for my $f_table (@files) {
         }
 
         while ( my @record_data = $db->fetch() ) {
-            $sqlcommand = '';
-
-            for ( my $i = 0 ; $i < $num_f ; $i++ ) {
-
-                if ( $type[$i] eq 0x01 || $type[$i] eq 0x0C ) {
-
-                    if ( $record_data[$i] ne '' ) {
-                        $record_data[$i] =~
-s/\x09|\x0D|\x0A/'\\x'.sprintf ("%02X", unpack("C", $&))/ge;
-                        $record_data[$i] =~ s/\\/\\\\/g;
-
-                        unless ($code_page) {
-                            $record_data[$i] =
-                              encode( "$opts{'d'}", $record_data[$i] )
-                              if ( $opts{'d'} );
-                        }
-                        else {
-                            if ( $opts{'d'} ) {
-                                $record_data[$i] =
-                                  encode( "$opts{'d'}",
-                                    decode( $code_page, $record_data[$i] ) );
-                            }
-                            else {
-                                $record_data[$i] =
-                                  decode( $code_page, $record_data[$i] );
-                            }
-                        }
-                    }
-                    else { $record_data[$i] = '\N' }
-
-                }
-
-                elsif ( ( $type[$i] eq 0x02 ) or ( $type[$i] eq 0x14 ) ) {
-                    if ( $record_data[$i] ne '' ) {
-                        $record_data[$i] = "'" . $record_data[$i] . "'";
-                    }
-                    else { $record_data[$i] = '\N'; }
-                }
-
-                elsif (( $type[$i] eq 0x04 )
-                    or ( $type[$i] eq 0x06 )
-                    or ( $type[$i] eq 0x03 ) )
-                {
-                    if ( $record_data[$i] eq '' ) { $record_data[$i] = 0; }
-                }
-
-                $sqlcommand .= "$record_data[$i]" . "\t";
-            }
-
-            $sqlcommand = substr( $sqlcommand, 0, length($sqlcommand) - 1 );
-            $sqlcommand .= "\n";
+            $sqlcommand = &convert_data(\@record_data);
             if ( !$opts{'f'} ) {
                 $dbh->pg_putcopydata($sqlcommand);
 
@@ -214,4 +113,96 @@ sub getoptions {
 sub select_codepage {
     my $codepage = shift;
     return 'cp' . $codepage if ($codepage);
+}
+
+sub create_table{
+	my $f_table  = shift;
+	my $sqlcommand = "CREATE TABLE $f_table (";
+	
+	for ( my $i = 0 ; $i < $num_f ; $i++ ) {
+        $sqlcommand .= '"' . $name[$i] . '"' . ' ';
+        if ( $type[$i] eq 0x01 ) {
+            $_ = 'char(' . $len[$i] . ')';
+        }
+        elsif ( $type[$i] eq 0x02 ) {
+            $_ = 'date';
+        }
+        elsif ( $type[$i] eq 0x0C ) {
+            $_ = 'text';
+        }
+        elsif ( $type[$i] eq 0x09 ) {
+            $_ = 'boolean';
+        }
+        elsif ( $type[$i] eq 0x03 ) {
+            $_ = 'smallint';
+        }
+        elsif ( $type[$i] eq 0x04 ) {
+            $_ = 'integer';
+        }
+        elsif ( $type[$i] eq 0x06 ) {
+            $_ = 'float';
+        }
+        elsif ( $type[$i] eq 0x14 ) {
+            $_ = 'time';
+        }
+        elsif ( $type[$i] eq 0x16 ) {
+            $_ = 'integer';
+        }
+        $sqlcommand .= $_ . ', ';
+    }
+    $sqlcommand = substr( $sqlcommand, 0, length($sqlcommand) - 2 );
+    $sqlcommand .= ');';
+	return $sqlcommand;
+}
+
+sub convert_data{
+	my $record_data = shift;
+	my @record_data = @$record_data;
+	my $sqlcommand = '';
+            for ( my $i = 0 ; $i < $num_f ; $i++ ) {
+                if ( $type[$i] eq 0x01 || $type[$i] eq 0x0C ) {
+                    if ( $record_data[$i] ne '' ) {
+                        $record_data[$i] =~
+s/\x09|\x0D|\x0A/'\\x'.sprintf ("%02X", unpack("C", $&))/ge;
+                        $record_data[$i] =~ s/\\/\\\\/g;
+
+                        unless ($code_page) {
+                            $record_data[$i] =
+                              encode( "$opts{'d'}", $record_data[$i] )
+                              if ( $opts{'d'} );
+                        }
+                        else {
+                            if ( $opts{'d'} ) {
+                                $record_data[$i] =
+                                  encode( "$opts{'d'}",
+                                    decode( $code_page, $record_data[$i] ) );
+                            }
+                            else {
+                                $record_data[$i] =
+                                  decode( $code_page, $record_data[$i] );
+                            }
+                        }
+                    }
+                    else { $record_data[$i] = '\N' }
+                }
+                elsif ( ( $type[$i] eq 0x02 ) or ( $type[$i] eq 0x14 ) ) {
+                    if ( $record_data[$i] ne '' ) {
+                        $record_data[$i] = "'" . $record_data[$i] . "'";
+                    }
+                    else { $record_data[$i] = '\N'; }
+                }
+
+                elsif (( $type[$i] eq 0x04 )
+                    or ( $type[$i] eq 0x06 )
+                    or ( $type[$i] eq 0x03 ) )
+                {
+                    if ( $record_data[$i] eq '' ) { $record_data[$i] = 0; }
+                }
+                $sqlcommand .= "$record_data[$i]" . "\t";
+            }
+
+    $sqlcommand = substr( $sqlcommand, 0, length($sqlcommand) - 1 );
+    $sqlcommand .= "\n";
+	return $sqlcommand;
+		
 }
