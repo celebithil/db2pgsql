@@ -25,7 +25,6 @@ if ( !$opts{'f'} ) {
     $dbh->do("drop database $basename");
     $dbh->do("create database $basename;");
     $dbh->do("ALTER DATABASE $basename SET datestyle TO 'DMY';");
-    #$dbh->do("set datestyle TO 'DMY'");
     $dbh->disconnect();
     $dbh = DBI->connect( "DBI:Pg:dbname=$basename", "$login", "$password" )
       or die("Could't connect to database: $DBI:: errstr");
