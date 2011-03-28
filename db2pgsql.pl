@@ -15,7 +15,7 @@ my $basename = $opts{'n'};
 my $login    = $opts{'l'};
 my $password = $opts{'p'};
 my ($dbh, $sth);
-my ($num_f, $code_page);
+my ($num_f, $code_page, $num);
 my (@type, @len, @name);
 
 if ( !$opts{'f'} ) {
@@ -38,6 +38,8 @@ for my $f_table (@files) {
     @type      = @{ $db->{field_type} };
     @len       = @{ $db->{field_length} };
     @name      = @{ $db->{field_name} };
+    $num	   = $db->{all_records};
+    
 
     if ($code_page) {
         if ( $opts{'d'} ) {
@@ -53,7 +55,7 @@ for my $f_table (@files) {
     $f_table = substr( $f_table, 0, -3 );
 	my $sqlcommand = &create_table ($f_table);
 
-    if ( !$opts{'f'} ) {
+    unless ( $opts{'f'} ) {
         $sth = $dbh->prepare($sqlcommand);
         $sth->execute;
     }
@@ -61,29 +63,51 @@ for my $f_table (@files) {
     else { print( FILEOUT "$sqlcommand\n" ); }
     print "Table $f_table created\n";
 
-    if ( $db->{all_records} ) {
-        if ( !$opts{'f'} ) {
+    if ( $num ) {
+        unless ( $opts{'f'} ) {
             $sqlcommand = "copy $f_table from stdin";
             $dbh->do($sqlcommand) or die $DBI::errstr;
+			
+			for ( my $j = 1 ; $j <= $num ; $j++ ) {
+				my @record_data = $db->fetch(); 
+				$sqlcommand = &convert_data(\@record_data);
+				$dbh->pg_putcopydata($sqlcommand);
+				if ( !( $j % $opts{'c'} ) and $j < $num ) {
+					$dbh->pg_putcopyend();
+                    $sqlcommand = "copy $f_table from stdin";
+                    $dbh->do($sqlcommand) or die $DBI::errstr;
+                    print "$j records of $num from $f_table copied\n";
+						
+			}
         }
+        $dbh->pg_putcopyend();
 
-        while ( my @record_data = $db->fetch() ) {
-            $sqlcommand = &convert_data(\@record_data);
-            if ( !$opts{'f'} ) {
-                $dbh->pg_putcopydata($sqlcommand);
 
+        }
+        else {
+            my $buffer = '';
+            for ( my $j = 1 ; $j <= $num ; $j++ ) {
+                my @record_data = $db->fetch();
+                $sqlcommand = &convert_data( \@record_data );
+                $buffer .= $sqlcommand;
+                if ( !( $j % $opts{'c'} ) and $j < $num ) {
+                    print( FILEOUT "$buffer" );
+                    print "$j records of $num from $f_table copied\n";
+                    $buffer = '';
+                }
             }
-            else { print( FILEOUT "$sqlcommand" ) }
-
+            print( FILEOUT "$buffer" );
         }
 
-        if ( !$opts{'f'} ) { $dbh->pg_putcopyend(); }
+        
     }
-
+ 
+    
     print "Table $f_table copied\n";
+    #$db->close();
 }
 
-if ( !$opts{'f'} ) {
+unless ( $opts{'f'} ) {
     $dbh->disconnect();
 }
 else { close(FILEOUT) }
@@ -97,7 +121,7 @@ sub basename {
 
 sub getoptions {
 
-    getopt( 'sdmnlpf', \%opts );
+    getopt( 'dnlpfc', \%opts );
     unless (%opts) {
         die "
     no parametres!!!\n
@@ -105,9 +129,11 @@ sub getoptions {
     -p password\n
     -n basename (if empty, basename =  name of current directory)\n
     -d destination codepage\n
-    -f print sql commands in file (by default converting in base directly) \n";
+    -f print sql commands in file (by default converting in base directly) \n
+    -c count of records for one time recording to base (default 10000)\n";
     }
     unless ( defined $opts{'n'} ) { $opts{'n'} = &basename }
+    unless ( defined $opts{'c'} ) { $opts{'c'} = 10000 }
 
 }
 
