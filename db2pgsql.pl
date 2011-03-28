@@ -23,7 +23,9 @@ if ( !$opts{'f'} ) {
     $dbh = DBI->connect( "DBI:Pg:dbname=postgres", "$login", "$password" )
       or die("Could't connect to database: $DBI:: errstr");
     $dbh->do("drop database $basename");
-    $dbh->do("create database $basename");
+    $dbh->do("create database $basename;");
+    $dbh->do("ALTER DATABASE $basename SET datestyle TO 'DMY';");
+    #$dbh->do("set datestyle TO 'DMY'");
     $dbh->disconnect();
     $dbh = DBI->connect( "DBI:Pg:dbname=$basename", "$login", "$password" )
       or die("Could't connect to database: $DBI:: errstr");
