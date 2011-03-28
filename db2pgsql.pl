@@ -33,7 +33,7 @@ else { open FILEOUT, "> $opts{'f'}" . '.sql' }
 for my $f_table (@files) {
 
     my $db        = new Paradox "$f_table";
-    $code_page = &select_codepage( $db->{code_page} );
+    $code_page = 'cp' . $db->{code_page} if $db->{code_page};
     @type      = @{ $db->{field_type} };
     @len       = @{ $db->{field_length} };
     @name      = @{ $db->{field_name} };
@@ -108,11 +108,6 @@ sub getoptions {
     }
     unless ( defined $opts{'n'} ) { $opts{'n'} = &basename }
 
-}
-
-sub select_codepage {
-    my $codepage = shift;
-    return 'cp' . $codepage if ($codepage);
 }
 
 sub create_table{
