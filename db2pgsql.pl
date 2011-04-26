@@ -170,7 +170,10 @@ sub create_table{
         elsif ( $type[$i] eq 0x16 ) {
             $_ = 'integer';
         }
-        $sqlcommand .= $_ . ', ';
+        elsif ( $type[$i] eq 0x10 ) {
+            $_ = 'bytea';
+        }
+		$sqlcommand .= $_ . ', ';
     }
     $sqlcommand = substr( $sqlcommand, 0, length($sqlcommand) - 2 );
     $sqlcommand .= ');';
@@ -220,7 +223,18 @@ s/\x09|\x0D|\x0A/'\\x'.sprintf ("%02X", unpack("C", $&))/ge;
                 {
                     if ( $record_data[$i] eq '' ) { $record_data[$i] = 0; }
                 }
-                $sqlcommand .= "$record_data[$i]" . "\t";
+                
+				elsif (( $type[$i] eq 0x10 ))
+				{
+					$record_data[$i] =~
+s/[\x00-\x19\x27\x5C\x7F-\xFF]/'\\'.sprintf ("%03o", unpack("C", $&))/ge;
+                    $record_data[$i] = 'E\'' . $record_data[$i] . '\'';
+					print  "$record_data[$i] \n";
+				}
+				
+				
+				
+				$sqlcommand .= "$record_data[$i]" . "\t";
             }
 
     $sqlcommand = substr( $sqlcommand, 0, length($sqlcommand) - 1 );
