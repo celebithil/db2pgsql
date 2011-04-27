@@ -227,9 +227,9 @@ s/\x09|\x0D|\x0A/'\\x'.sprintf ("%02X", unpack("C", $&))/ge;
 				elsif (( $type[$i] eq 0x10 ))
 				{
 					$record_data[$i] =~
-s/[\x00-\x19\x27\x5C\x7F-\xFF]/'\\'.sprintf ("%03o", unpack("C", $&))/ge;
-                    $record_data[$i] = 'E\'' . $record_data[$i] . '\'';
-					print  "$record_data[$i] \n";
+s/[\x00-\x19\x27\x5C\x7F-\xFF]/'\\\\'.sprintf ("%03o", unpack("C", $&))/ge;
+                    #$record_data[$i] = 'E\'' . $record_data[$i] . '\'';
+					#print  "$record_data[$i] \n";
 				}
 				
 				
