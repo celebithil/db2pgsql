@@ -14,9 +14,9 @@ my @files    = glob("*.[Dd][Bb]");
 my $basename = $opts{'n'};
 my $login    = $opts{'l'};
 my $password = $opts{'p'};
-my ($dbh, $sth);
-my ($num_f, $code_page, $num);
-my (@type, @len, @name);
+my ( $dbh,   $sth );
+my ( $num_f, $code_page, $num );
+my ( @type,  @len, @name );
 
 if ( !$opts{'f'} ) {
 
@@ -33,13 +33,12 @@ else { open FILEOUT, "> $opts{'f'}" . '.sql' }
 
 for my $f_table (@files) {
 
-    my $db        = new Paradox "$f_table";
+    my $db = new Paradox "$f_table";
     $code_page = 'cp' . $db->{code_page} if $db->{code_page};
     @type      = @{ $db->{field_type} };
     @len       = @{ $db->{field_length} };
     @name      = @{ $db->{field_name} };
-    $num	   = $db->{all_records};
-    
+    $num       = $db->{all_records};
 
     if ($code_page) {
         if ( $opts{'d'} ) {
@@ -50,10 +49,10 @@ for my $f_table (@files) {
         }
 
     }
-	
+
     $num_f = scalar(@type);
     $f_table = substr( $f_table, 0, -3 );
-	my $sqlcommand = &create_table ($f_table);
+    my $sqlcommand = &create_table($f_table);
 
     unless ( $opts{'f'} ) {
         $sth = $dbh->prepare($sqlcommand);
@@ -63,25 +62,24 @@ for my $f_table (@files) {
     else { print( FILEOUT "$sqlcommand\n" ); }
     print "Table $f_table created\n";
 
-    if ( $num ) {
+    if ($num) {
         unless ( $opts{'f'} ) {
             $sqlcommand = "copy $f_table from stdin";
             $dbh->do($sqlcommand) or die $DBI::errstr;
-			
-			for ( my $j = 1 ; $j <= $num ; $j++ ) {
-				my @record_data = $db->fetch(); 
-				$sqlcommand = &convert_data(\@record_data);
-				$dbh->pg_putcopydata($sqlcommand);
-				if ( !( $j % $opts{'c'} ) and $j < $num ) {
-					$dbh->pg_putcopyend();
+
+            for ( my $j = 1 ; $j <= $num ; $j++ ) {
+                my @record_data = $db->fetch();
+                $sqlcommand = &convert_data( \@record_data );
+                $dbh->pg_putcopydata($sqlcommand);
+                if ( !( $j % $opts{'c'} ) and $j < $num ) {
+                    $dbh->pg_putcopyend();
                     $sqlcommand = "copy $f_table from stdin";
                     $dbh->do($sqlcommand) or die $DBI::errstr;
                     print "$j records of $num from $f_table copied\n";
-						
-			}
-        }
-        $dbh->pg_putcopyend();
 
+                }
+            }
+            $dbh->pg_putcopyend();
 
         }
         else {
@@ -99,10 +97,8 @@ for my $f_table (@files) {
             print( FILEOUT "$buffer" );
         }
 
-        
     }
- 
-    
+
     print "Table $f_table copied\n";
     $db->close();
 }
@@ -137,11 +133,11 @@ sub getoptions {
 
 }
 
-sub create_table{
-	my $f_table  = shift;
-	my $sqlcommand = "CREATE TABLE $f_table (";
-	
-	for ( my $i = 0 ; $i < $num_f ; $i++ ) {
+sub create_table {
+    my $f_table    = shift;
+    my $sqlcommand = "CREATE TABLE $f_table (";
+
+    for ( my $i = 0 ; $i < $num_f ; $i++ ) {
         $sqlcommand .= '"' . $name[$i] . '"' . ' ';
         if ( $type[$i] eq 0x01 ) {
             $_ = 'char(' . $len[$i] . ')';
@@ -173,70 +169,66 @@ sub create_table{
         elsif ( $type[$i] eq 0x10 ) {
             $_ = 'bytea';
         }
-		$sqlcommand .= $_ . ', ';
+        $sqlcommand .= $_ . ', ';
     }
     $sqlcommand = substr( $sqlcommand, 0, length($sqlcommand) - 2 );
     $sqlcommand .= ');';
-	return $sqlcommand;
+    return $sqlcommand;
 }
 
-sub convert_data{
-	my $record_data = shift;
-	my @record_data = @$record_data;
-	my $sqlcommand = '';
-            for ( my $i = 0 ; $i < $num_f ; $i++ ) {
-                if ( $type[$i] eq 0x01 || $type[$i] eq 0x0C ) {
-                    if ( $record_data[$i] ne '' ) {
-                        $record_data[$i] =~
-s/\x09|\x0D|\x0A/'\\x'.sprintf ("%02X", unpack("C", $&))/ge;
-                        $record_data[$i] =~ s/\\/\\\\/g;
+sub convert_data {
+    my $record_data = shift;
+    my @record_data = @$record_data;
+    my $sqlcommand  = '';
+    for ( my $i = 0 ; $i < $num_f ; $i++ ) {
+        if ( $type[$i] eq 0x01 || $type[$i] eq 0x0C ) {
+            if ( $record_data[$i] ne '' ) {
+                $record_data[$i] =~
+                  s/\x09|\x0D|\x0A/'\\x'.sprintf ("%02X", unpack("C", $&))/ge;
+                $record_data[$i] =~ s/\\/\\\\/g;
 
-                        unless ($code_page) {
-                            $record_data[$i] =
-                              encode( "$opts{'d'}", $record_data[$i] )
-                              if ( $opts{'d'} );
-                        }
-                        else {
-                            if ( $opts{'d'} ) {
-                                $record_data[$i] =
-                                  encode( "$opts{'d'}",
-                                    decode( $code_page, $record_data[$i] ) );
-                            }
-                            else {
-                                $record_data[$i] =
-                                  decode( $code_page, $record_data[$i] );
-                            }
-                        }
+                unless ($code_page) {
+                    $record_data[$i] = encode( "$opts{'d'}", $record_data[$i] )
+                      if ( $opts{'d'} );
+                }
+                else {
+                    if ( $opts{'d'} ) {
+                        $record_data[$i] =
+                          encode( "$opts{'d'}",
+                            decode( $code_page, $record_data[$i] ) );
                     }
-                    else { $record_data[$i] = '\N' }
-                }
-                elsif ( ( $type[$i] eq 0x02 ) or ( $type[$i] eq 0x14 ) ) {
-                    if ( $record_data[$i] ne '' ) {
-                        $record_data[$i] = "'" . $record_data[$i] . "'";
+                    else {
+                        $record_data[$i] =
+                          decode( $code_page, $record_data[$i] );
                     }
-                    else { $record_data[$i] = '\N'; }
                 }
-
-                elsif (( $type[$i] eq 0x04 )
-                    or ( $type[$i] eq 0x06 )
-                    or ( $type[$i] eq 0x03 ) )
-                {
-                    if ( $record_data[$i] eq '' ) { $record_data[$i] = 0; }
-                }
-                
-				elsif (( $type[$i] eq 0x10 ))
-				{
-					$record_data[$i] =~
-s/[\x00-\x19\x27\x5C\x7F-\xFF]/'\\\\'.sprintf ("%03o", unpack("C", $&))/ge;
-				}
-				
-				
-				
-				$sqlcommand .= "$record_data[$i]" . "\t";
             }
+            else { $record_data[$i] = '\N' }
+        }
+        elsif ( ( $type[$i] eq 0x02 ) or ( $type[$i] eq 0x14 ) ) {
+            if ( $record_data[$i] ne '' ) {
+                $record_data[$i] = "'" . $record_data[$i] . "'";
+            }
+            else { $record_data[$i] = '\N'; }
+        }
+
+        elsif (( $type[$i] eq 0x04 )
+            or ( $type[$i] eq 0x06 )
+            or ( $type[$i] eq 0x03 ) )
+        {
+            if ( $record_data[$i] eq '' ) { $record_data[$i] = 0; }
+        }
+
+        elsif ( ( $type[$i] eq 0x10 ) ) {
+            $record_data[$i] =~
+s/[\x00-\x19\x27\x5C\x7F-\xFF]/'\\\\'.sprintf ("%03o", unpack("C", $&))/ge;
+        }
+
+        $sqlcommand .= "$record_data[$i]" . "\t";
+    }
 
     $sqlcommand = substr( $sqlcommand, 0, length($sqlcommand) - 1 );
     $sqlcommand .= "\n";
-	return $sqlcommand;
-		
+    return $sqlcommand;
+
 }
