@@ -66,7 +66,7 @@ for my $f_table (@files) {                        # for every file in folder
     print "Table $f_table created\n";
 
     if ($num) {    # if table not empty
-        unless ( $opts{'f'} ) {    # copy in table
+        unless ( $opts{'f'} ) {    # copy in base
             $sqlcommand = "copy $f_table from stdin";
             $dbh->do($sqlcommand) or die $DBI::errstr;
 
