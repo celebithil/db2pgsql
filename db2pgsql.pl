@@ -10,15 +10,17 @@ use strict;
 
 our %opts;
 &getoptions;
-my @files    = glob("*.[Dd][Bb]");
-my $basename = $opts{'n'};
-my $login    = $opts{'l'};
-my $password = $opts{'p'};
-my ( $dbh,   $sth );
-my ( $num_f, $code_page, $num );
-my ( @type,  @len, @name );
+my @files    = glob("*.[Dd][Bb]");    # array of all database files in folder
+my $basename = $opts{'n'};            # name of database
+my $login    = $opts{'l'};            # login to PGSQL server
+my $password = $opts{'p'};            # password to PGSQL server
+my ( $dbh, $sth );
+my ( $num_f, $code_page, $num )
+  ; #number of fields in Paradox file, code page for data in Paradox file, number of records in Paradox
+my ( @type, @len, @name )
+  ; # array data types of fields in Paradox file, array data length of fields in Paradox file,  array data length of fields in Paradox file
 
-if ( !$opts{'f'} ) {
+if ( !$opts{'f'} ) {    # convert data to PGSQL
 
     $dbh = DBI->connect( "DBI:Pg:dbname=postgres", "$login", "$password" )
       or die("Could't connect to database: $DBI:: errstr");
@@ -29,16 +31,17 @@ if ( !$opts{'f'} ) {
     $dbh = DBI->connect( "DBI:Pg:dbname=$basename", "$login", "$password" )
       or die("Could't connect to database: $DBI:: errstr");
 }
-else { open FILEOUT, "> $opts{'f'}" . '.sql' }
+else { open FILEOUT, "> $opts{'f'}" . '.sql' }    #convert data to file
 
-for my $f_table (@files) {
+for my $f_table (@files) {                        # for every file in folder
 
     my $db = new Paradox "$f_table";
-    $code_page = 'cp' . $db->{code_page} if $db->{code_page};
-    @type      = @{ $db->{field_type} };
-    @len       = @{ $db->{field_length} };
-    @name      = @{ $db->{field_name} };
-    $num       = $db->{all_records};
+    $code_page = 'cp' . $db->{code_page}
+      if $db->{code_page};    # get codepage for using in decode
+    @type = @{ $db->{field_type} };
+    @len  = @{ $db->{field_length} };
+    @name = @{ $db->{field_name} };
+    $num  = $db->{all_records};
 
     if ($code_page) {
         if ( $opts{'d'} ) {
@@ -62,8 +65,8 @@ for my $f_table (@files) {
     else { print( FILEOUT "$sqlcommand\n" ); }
     print "Table $f_table created\n";
 
-    if ($num) {
-        unless ( $opts{'f'} ) {
+    if ($num) {    # if table not empty
+        unless ( $opts{'f'} ) {    # copy in table
             $sqlcommand = "copy $f_table from stdin";
             $dbh->do($sqlcommand) or die $DBI::errstr;
 
@@ -71,7 +74,8 @@ for my $f_table (@files) {
                 my @record_data = $db->fetch();
                 $sqlcommand = &convert_data( \@record_data );
                 $dbh->pg_putcopydata($sqlcommand);
-                if ( !( $j % $opts{'c'} ) and $j < $num ) {
+                if ( !( $j % $opts{'c'} ) and $j < $num )
+                {                  # copy $opts{'c'} records
                     $dbh->pg_putcopyend();
                     $sqlcommand = "copy $f_table from stdin";
                     $dbh->do($sqlcommand) or die $DBI::errstr;
@@ -82,13 +86,14 @@ for my $f_table (@files) {
             $dbh->pg_putcopyend();
 
         }
-        else {
+        else {                     #copy in file
             my $buffer = '';
             for ( my $j = 1 ; $j <= $num ; $j++ ) {
                 my @record_data = $db->fetch();
                 $sqlcommand = &convert_data( \@record_data );
                 $buffer .= $sqlcommand;
-                if ( !( $j % $opts{'c'} ) and $j < $num ) {
+                if ( !( $j % $opts{'c'} ) and $j < $num )
+                {                  # copy $opts{'c'} records
                     print( FILEOUT "$buffer" );
                     print "$j records of $num from $f_table copied\n";
                     $buffer = '';
@@ -108,14 +113,14 @@ unless ( $opts{'f'} ) {
 }
 else { close(FILEOUT) }
 
-sub basename {
+sub basename {    # get name of base
     my $full_path = cwd;
     my @dirs      = split( /\//, $full_path );
     my $basename  = lc( $dirs[ scalar(@dirs) - 1 ] );
     return $basename;
 }
 
-sub getoptions {
+sub getoptions {    # get options from command line
 
     getopt( 'dnlpfc', \%opts );
     unless (%opts) {
@@ -133,7 +138,7 @@ sub getoptions {
 
 }
 
-sub create_table {
+sub create_table {    # make command 'CREATE TABLE'
     my $f_table    = shift;
     my $sqlcommand = "CREATE TABLE $f_table (";
 
@@ -176,7 +181,7 @@ sub create_table {
     return $sqlcommand;
 }
 
-sub convert_data {
+sub convert_data {    # convert data to copy
     my $record_data = shift;
     my @record_data = @$record_data;
     my $sqlcommand  = '';
