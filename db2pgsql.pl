@@ -36,7 +36,7 @@ else { open FILEOUT, "> $opts{'f'}" . '.sql' }    #convert data to file
 for my $f_table (@files) {                        # for every file in folder
 
     my $db = new Paradox "$f_table";
-    $code_page = 'cp' . $db->{code_page}
+    $code_page = $db->{code_page}
       if $db->{code_page};    # get codepage for using in decode
     @type = @{ $db->{field_type} };
     @len  = @{ $db->{field_length} };
