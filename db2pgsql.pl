@@ -8,7 +8,7 @@ use Getopt::Std;
 use warnings;
 use strict;
 
-our %opts;
+my %opts;
 &getoptions;
 my @files    = glob("*.[Dd][Bb]");    # array of all database files in folder
 my $basename = $opts{'n'};            # name of database
@@ -31,7 +31,7 @@ unless ( $opts{'f'} ) {    # convert data to PGSQL
     $dbh = DBI->connect( "DBI:Pg:dbname=$basename", "$login", "$password" )
       or die("Could't connect to database: $DBI:: errstr");
 }
-else { open FILEOUT, "> $opts{'f'}" . '.sql' }    #convert data to file
+else { open FILEOUT, "> $opts{'N'}" . '.sql' }    #convert data to file
 
 for my $f_table (@files) {                        # for every file in folder
 
@@ -84,7 +84,6 @@ for my $f_table (@files) {                        # for every file in folder
                 }
             }
             $dbh->pg_putcopyend();
-
         }
         else {                     #copy in file
             my $buffer = '';
@@ -121,20 +120,22 @@ sub basename {    # get name of base
 }
 
 sub getoptions {    # get options from command line
-
-    getopt( 'dnlpfc', \%opts );
+    getopts( 'd:m:n:l:p:c:N:f', \%opts );
     unless (%opts) {
         die "
     no parametres!!!\n
     -l login\n
     -p password\n
     -n basename (if empty, basename =  name of current directory)\n
-    -d destination codepage\n
+    -d destination codepage (default cp1251)\n
     -f print sql commands in file (by default converting in base directly) \n
+    -N name of output file (by default using basename)\n
     -c count of records for one time recording to base (default 10000)\n";
     }
-    unless ( defined $opts{'n'} ) { $opts{'n'} = &basename }
-    unless ( defined $opts{'c'} ) { $opts{'c'} = 10000 }
+    $opts{'n'} //= &basename;
+    $opts{'c'} //= 10000;
+	$opts{'d'} //= 'cp1251';
+    $opts{'N'} //= $opts{'n'};
 
 }
 
@@ -189,7 +190,7 @@ sub convert_data {    # convert data to copy
         if ( $type[$i] eq 0x01 || $type[$i] eq 0x0C ) {
             if ( $record_data[$i] ne '' ) {
                 $record_data[$i] =~
-                  s/\x09|\x0D|\x0A/'\\x'.sprintf ("%02X", unpack("C", $&))/ge;
+                  s/(\x09|\x0D|\x0A)/'\\x'.sprintf ("%02X", unpack("C", $1))/ge;
                 $record_data[$i] =~ s/\\/\\\\/g;
 
                 unless ($code_page) {
@@ -226,7 +227,7 @@ sub convert_data {    # convert data to copy
 
         elsif ( ( $type[$i] eq 0x10 ) ) {
             $record_data[$i] =~
-s/[\x00-\x19\x27\x5C\x7F-\xFF]/'\\\\'.sprintf ("%03o", unpack("C", $&))/ge;
+s/([\x00-\x19\x27\x5C\x7F-\xFF])/'\\\\'.sprintf ("%03o", unpack("C", $1))/ge;
         }
 
         $sqlcommand .= "$record_data[$i]" . "\t";
