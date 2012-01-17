@@ -20,7 +20,7 @@ my ( $num_f, $code_page, $num )
 my ( @type, @len, @name )
   ; # array data types of fields in Paradox file, array data length of fields in Paradox file,  array data length of fields in Paradox file
 
-if ( !$opts{'f'} ) {    # convert data to PGSQL
+unless ( $opts{'f'} ) {    # convert data to PGSQL
 
     $dbh = DBI->connect( "DBI:Pg:dbname=postgres", "$login", "$password" )
       or die("Could't connect to database: $DBI:: errstr");
