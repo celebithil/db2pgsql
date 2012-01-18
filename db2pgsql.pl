@@ -15,7 +15,7 @@ my @files    = glob("*.[Dd][Bb]");    # array of all database files in folder
 my $basename = $opts{'n'};            # name of database
 my $login    = $opts{'l'};            # login to PGSQL server
 my $password = $opts{'p'};            # password to PGSQL server
-my ( $dbh, $sth );
+my ( $dbh,       $sth );
 my ( $code_page, $num )
   ; #number of fields in Paradox file, code page for data in Paradox file, number of records in Paradox
 my ( @type, @len, @name )
@@ -139,48 +139,35 @@ sub getoptions {    # get options from command line
 
 }
 
-
-
 sub create_table {    # make command 'CREATE TABLE'
     my $f_table    = shift;
     my $sqlcommand = "CREATE TABLE $f_table (";
-    for my $i (0 .. $#type) {
+    for my $i ( 0 .. $#type ) {
         $sqlcommand .= '"' . $name[$i] . '" ';
-        given ($type[$i]) {
-            when (0x01) 
-            {$sqlcommand .= 'char(' . $len[$i] . ')'; break;} 
-            when (0x02)
-            {$sqlcommand .= 'date'; break}
-            when (0x0C)
-            {$sqlcommand .= 'text'; break}
-            when (0x09)
-            {$sqlcommand .= 'boolean'; break}
-            when (0x03)
-            {$sqlcommand .= 'smallint'; break}
-            when (0x04)
-            {$sqlcommand .= 'integer'; break}
-            when (0x06)
-            {$sqlcommand .= 'float'; break}
-            when (0x14)
-            {$sqlcommand .= 'time'; break}
-            when (0x16)
-            {$sqlcommand .= 'integer'; break}
-            when (0x10)
-            {$sqlcommand .= 'bytea'; break}
+        given ( $type[$i] ) {
+            when (0x01) { $sqlcommand .= 'char(' . $len[$i] . ')'; break; }
+            when (0x02) { $sqlcommand .= 'date';                   break }
+            when (0x0C) { $sqlcommand .= 'text';                   break }
+            when (0x09) { $sqlcommand .= 'boolean';                break }
+            when (0x03) { $sqlcommand .= 'smallint';               break }
+            when (0x04) { $sqlcommand .= 'integer';                break }
+            when (0x06) { $sqlcommand .= 'float';                  break }
+            when (0x14) { $sqlcommand .= 'time';                   break }
+            when (0x16) { $sqlcommand .= 'integer';                break }
+            when (0x10) { $sqlcommand .= 'bytea';                  break }
         }
-    $sqlcommand .=', ';
+        $sqlcommand .= ', ';
     }
     $sqlcommand = substr( $sqlcommand, 0, length($sqlcommand) - 2 );
     $sqlcommand .= ');';
     return $sqlcommand;
 }
 
-
 sub convert_data {    # convert data to copy
     my $record_data = shift;
     my @record_data = @$record_data;
     my $sqlcommand  = '';
-    for my $i (0 .. $#type) {
+    for my $i ( 0 .. $#type ) {
         if ( $type[$i] eq 0x01 || $type[$i] eq 0x0C ) {
             if ( $record_data[$i] ne '' ) {
                 $record_data[$i] =~
