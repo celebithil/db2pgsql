@@ -134,7 +134,7 @@ sub getoptions {    # get options from command line
     }
     $opts{'n'} //= &basename;
     $opts{'c'} //= 10000;
-	$opts{'d'} //= 'cp1251';
+    $opts{'d'} //= 'cp1251';
     $opts{'N'} //= $opts{'n'};
 
 }
