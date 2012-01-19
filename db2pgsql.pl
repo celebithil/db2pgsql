@@ -165,9 +165,7 @@ sub create_table {    # make command 'CREATE TABLE'
 
 sub convert_data {    # convert data to copy
     my $record_data = shift;
-
-    #my @record_data = @$record_data;
-    my $sqlcommand = '';
+    my $sqlcommand  = [];
     for my $i ( 0 .. $#type ) {
 
         given ( $type[$i] ) {
@@ -189,13 +187,9 @@ sub convert_data {    # convert data to copy
                 break;
             }
         }
-        $sqlcommand .= "$$record_data[$i]" . "\t";
+        push @$sqlcommand, $$record_data[$i];
     }
-
-    $sqlcommand = substr( $sqlcommand, 0, length($sqlcommand) - 1 );
-    $sqlcommand .= "\n";
-    return $sqlcommand;
-
+    return join( "\t", @$sqlcommand ) . "\n";
 }
 
 sub get_quoted_and_coded_text {
