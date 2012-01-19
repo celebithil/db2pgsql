@@ -165,26 +165,32 @@ sub create_table {    # make command 'CREATE TABLE'
 
 sub convert_data {    # convert data to copy
     my $record_data = shift;
+
     #my @record_data = @$record_data;
-    my $sqlcommand  = '';
+    my $sqlcommand = '';
     for my $i ( 0 .. $#type ) {
-        
-		given ($type[$i]) {
-		    when ([0x01, 0x0C]) {
-			    $$record_data [$i] = &get_quoted_and_coded_text ($$record_data [$i]) // '\N'; break;
-			}
-		    when ([0x02, 0x14]) {
-			    $$record_data[$i] = "'" . $$record_data[$i] . "'" // '\N'; break;
-			}
-			when ([0x04, 0x06, 0x03]) {
-			    $$record_data[$i] //=0; break;
-			}
+
+        given ( $type[$i] ) {
+            when ( [ 0x01, 0x0C ] ) {
+                $$record_data[$i] =
+                  &get_quoted_and_coded_text( $$record_data[$i] ) // '\N';
+                break;
+            }
+            when ( [ 0x02, 0x14 ] ) {
+                $$record_data[$i] = "'" . $$record_data[$i] . "'" // '\N';
+                break;
+            }
+            when ( [ 0x04, 0x06, 0x03 ] ) {
+                $$record_data[$i] //= 0;
+                break;
+            }
             when (0x10) {
-			    $$record_data[$i] = &get_quoted_blob ($$record_data[$i]); break;
-			}
+                $$record_data[$i] = &get_quoted_blob( $$record_data[$i] );
+                break;
+            }
         }
-		$sqlcommand .= "$$record_data[$i]" . "\t";
-	}
+        $sqlcommand .= "$$record_data[$i]" . "\t";
+    }
 
     $sqlcommand = substr( $sqlcommand, 0, length($sqlcommand) - 1 );
     $sqlcommand .= "\n";
@@ -194,23 +200,23 @@ sub convert_data {    # convert data to copy
 
 sub get_quoted_and_coded_text {
     my $record = shift;
-    $record =~
-    s/(\x09|\x0D|\x0A)/'\\x'.sprintf ("%02X", unpack("C", $1))/ge;
+    $record =~ s/(\x09|\x0D|\x0A)/'\\x'.sprintf ("%02X", unpack("C", $1))/ge;
     $record =~ s/\\/\\\\/g;
     unless ($code_page) {
-    $record = encode( "$opts{'d'}", $record )
-                      if ( $opts{'d'} );
+        $record = encode( "$opts{'d'}", $record )
+          if ( $opts{'d'} );
     }
     else {
-	    if ( $opts{'d'} ) {
-		    $record = encode( "$opts{'d'}", decode( $code_page, $record ) );
+        if ( $opts{'d'} ) {
+            $record = encode( "$opts{'d'}", decode( $code_page, $record ) );
         }
         else {
-		    $record = decode( $code_page, $record );
+            $record = decode( $code_page, $record );
         }
     }
     $record;
 }
+
 sub get_quoted_blob {
     my $record = shift;
     $record =~
