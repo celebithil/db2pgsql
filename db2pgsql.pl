@@ -165,57 +165,55 @@ sub create_table {    # make command 'CREATE TABLE'
 
 sub convert_data {    # convert data to copy
     my $record_data = shift;
-    my @record_data = @$record_data;
+    #my @record_data = @$record_data;
     my $sqlcommand  = '';
     for my $i ( 0 .. $#type ) {
-        if ( $type[$i] eq 0x01 || $type[$i] eq 0x0C ) {
-            if ( $record_data[$i] ne '' ) {
-                $record_data[$i] =~
-                  s/(\x09|\x0D|\x0A)/'\\x'.sprintf ("%02X", unpack("C", $1))/ge;
-                $record_data[$i] =~ s/\\/\\\\/g;
-
-                unless ($code_page) {
-                    $record_data[$i] = encode( "$opts{'d'}", $record_data[$i] )
-                      if ( $opts{'d'} );
-                }
-                else {
-                    if ( $opts{'d'} ) {
-                        $record_data[$i] =
-                          encode( "$opts{'d'}",
-                            decode( $code_page, $record_data[$i] ) );
-                    }
-                    else {
-                        $record_data[$i] =
-                          decode( $code_page, $record_data[$i] );
-                    }
-                }
-            }
-            else { $record_data[$i] = '\N' }
+        
+		given ($type[$i]) {
+		    when ([0x01, 0x0C]) {
+			    $$record_data [$i] = &get_quoted_and_coded_text ($$record_data [$i]) // '\N'; break;
+			}
+		    when ([0x02, 0x14]) {
+			    $$record_data[$i] = "'" . $$record_data[$i] . "'" // '\N'; break;
+			}
+			when ([0x04, 0x06, 0x03]) {
+			    $$record_data[$i] //=0; break;
+			}
+            when (0x10) {
+			    $$record_data[$i] = &get_quoted_blob ($$record_data[$i]); break;
+			}
         }
-        elsif ( ( $type[$i] eq 0x02 ) or ( $type[$i] eq 0x14 ) ) {
-            if ( $record_data[$i] ne '' ) {
-                $record_data[$i] = "'" . $record_data[$i] . "'";
-            }
-            else { $record_data[$i] = '\N'; }
-        }
-
-        elsif (( $type[$i] eq 0x04 )
-            or ( $type[$i] eq 0x06 )
-            or ( $type[$i] eq 0x03 ) )
-        {
-            if ( $record_data[$i] eq '' ) { $record_data[$i] = 0; }
-        }
-
-        elsif ( ( $type[$i] eq 0x10 ) ) {
-            $record_data[$i] =~
-s/([\x00-\x19\x27\x5C\x7F-\xFF])/'\\\\'.sprintf ("%03o", unpack("C", $1))/ge;
-        }
-
-        $sqlcommand .= "$record_data[$i]" . "\t";
-    }
+		$sqlcommand .= "$$record_data[$i]" . "\t";
+	}
 
     $sqlcommand = substr( $sqlcommand, 0, length($sqlcommand) - 1 );
     $sqlcommand .= "\n";
     return $sqlcommand;
 
+}
+
+sub get_quoted_and_coded_text {
+    my $record = shift;
+    $record =~
+    s/(\x09|\x0D|\x0A)/'\\x'.sprintf ("%02X", unpack("C", $1))/ge;
+    $record =~ s/\\/\\\\/g;
+    unless ($code_page) {
+    $record = encode( "$opts{'d'}", $record )
+                      if ( $opts{'d'} );
+    }
+    else {
+	    if ( $opts{'d'} ) {
+		    $record = encode( "$opts{'d'}", decode( $code_page, $record ) );
+        }
+        else {
+		    $record = decode( $code_page, $record );
+        }
+    }
+    $record;
+}
+sub get_quoted_blob {
+    my $record = shift;
+    $record =~
+s/([\x00-\x19\x27\x5C\x7F-\xFF])/'\\\\'.sprintf ("%03o", unpack("C", $1))/ge;
+    return $record;
 }
