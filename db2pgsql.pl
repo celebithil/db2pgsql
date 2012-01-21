@@ -134,7 +134,6 @@ sub getoptions {    # get options from command line
     }
     $opts{'n'} //= &basename;
     $opts{'c'} //= 10000;
-    $opts{'d'} //= 'cp1251';
     $opts{'N'} //= $opts{'n'};
 
 }
@@ -171,7 +170,7 @@ sub convert_data {    # convert data to copy
         given ( $type[$i] ) {
             when ( [ 0x01, 0x0C ] ) {
                 $$record_data[$i] =
-                  &get_quoted_and_coded_text( $$record_data[$i] ) // '\N';
+                  ${ &get_quoted_and_coded_text( \$$record_data[$i] ) } // '\N';
                 break;
             }
             when ( [ 0x02, 0x14 ] ) {
@@ -183,7 +182,8 @@ sub convert_data {    # convert data to copy
                 break;
             }
             when (0x10) {
-                $$record_data[$i] = &get_quoted_blob( $$record_data[$i] );
+                $$record_data[$i] = ${ &get_quoted_blob( \$$record_data[$i] ) }
+                  // '\N';
                 break;
             }
         }
@@ -194,26 +194,24 @@ sub convert_data {    # convert data to copy
 
 sub get_quoted_and_coded_text {
     my $record = shift;
-    $record =~ s/(\x09|\x0D|\x0A)/'\\x'.sprintf ("%02X", unpack("C", $1))/ge;
-    $record =~ s/\\/\\\\/g;
+    $$record =~ s/(\x09|\x0D|\x0A)/'\\x'.sprintf ("%02X", unpack("C", $1))/ge;
+    $$record =~ s/\\/\\\\/g;
     unless ($code_page) {
-        $record = encode( "$opts{'d'}", $record )
-          if ( $opts{'d'} );
+        $$record = ( $opts{'d'} ) ? encode( "$opts{'d'}", $$record ) : $$record;
     }
     else {
-        if ( $opts{'d'} ) {
-            $record = encode( "$opts{'d'}", decode( $code_page, $record ) );
-        }
-        else {
-            $record = decode( $code_page, $record );
-        }
+        $$record =
+          ( $opts{'d'} )
+          ? encode( "$opts{'d'}", decode( $code_page, $$record ) )
+          : decode( $code_page, $$record );
     }
+
     $record;
 }
 
 sub get_quoted_blob {
     my $record = shift;
-    $record =~
+    $$record =~
 s/([\x00-\x19\x27\x5C\x7F-\xFF])/'\\\\'.sprintf ("%03o", unpack("C", $1))/ge;
-    return $record;
+    $record;
 }
