@@ -140,26 +140,27 @@ sub getoptions {    # get options from command line
 
 sub create_table {    # make command 'CREATE TABLE'
     my $f_table    = shift;
-    my $sqlcommand = "CREATE TABLE $f_table (";
+    my $sqlcommand = [];
+	#my $sqlcommand = "CREATE TABLE $f_table (";
     for my $i ( 0 .. $#type ) {
-        $sqlcommand .= '"' . $name[$i] . '" ';
+		#$sqlcommand .= '"' . $name[$i] . '" ';
         given ( $type[$i] ) {
-            when (0x01) { $sqlcommand .= 'char(' . $len[$i] . ')'; break; }
-            when (0x02) { $sqlcommand .= 'date';                   break }
-            when (0x0C) { $sqlcommand .= 'text';                   break }
-            when (0x09) { $sqlcommand .= 'boolean';                break }
-            when (0x03) { $sqlcommand .= 'smallint';               break }
-            when (0x04) { $sqlcommand .= 'integer';                break }
-            when (0x06) { $sqlcommand .= 'float';                  break }
-            when (0x14) { $sqlcommand .= 'time';                   break }
-            when (0x16) { $sqlcommand .= 'integer';                break }
-            when (0x10) { $sqlcommand .= 'bytea';                  break }
+            when (0x01) {push @$sqlcommand, "\"$name[$i]\" char($len[$i])"; break; }
+            when (0x02) {push @$sqlcommand, "\"$name[$i]\" date";           break }
+            when (0x0C) {push @$sqlcommand, "\"$name[$i]\" text";           break }
+            when (0x09) {push @$sqlcommand, "\"$name[$i]\" boolean";                break }
+            when (0x03) {push @$sqlcommand, "\"$name[$i]\" smallint";               break }
+            when (0x04) {push @$sqlcommand, "\"$name[$i]\" integer";                break }
+            when (0x06) {push @$sqlcommand, "\"$name[$i]\" float";                  break }
+            when (0x14) {push @$sqlcommand, "\"$name[$i]\" time";                   break }
+            when (0x16) {push @$sqlcommand, "\"$name[$i]\" integer";                break }
+            when (0x10) {push @$sqlcommand, "\"$name[$i]\" bytea";                  break }
         }
-        $sqlcommand .= ', ';
+		#$sqlcommand .= ', ';
     }
-    $sqlcommand = substr( $sqlcommand, 0, length($sqlcommand) - 2 );
-    $sqlcommand .= ');';
-    return $sqlcommand;
+	#$sqlcommand = substr( $sqlcommand, 0, length($sqlcommand) - 2 );
+	#$sqlcommand .= ');';
+    return "CREATE TABLE $f_table (" . join (', ',  @$sqlcommand) . ');';
 }
 
 sub convert_data {    # convert data to copy
