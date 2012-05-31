@@ -11,18 +11,22 @@ use v5.10;
 
 my %opts;
 &getoptions;
-my @files    = glob("*.[Dd][Bb]");    # array of all database files in folder
-my $basename = $opts{'n'};            # name of database
-my $login    = $opts{'l'};            # login to PGSQL server
-my $password = $opts{'p'};            # password to PGSQL server
+# array of all database files in folder
+my @files    = glob("*.[Dd][Bb]");
+# name of database
+my $basename = $opts{'n'};
+# login to PGSQL server
+my $login    = $opts{'l'};
+# password to PGSQL server
+my $password = $opts{'p'};
 my ( $dbh,       $sth );
-my ( $code_page, $num )
-  ; #number of fields in Paradox file, code page for data in Paradox file, number of records in Paradox
-my ( @type, @len, @name )
-  ; # array data types of fields in Paradox file, array data length of fields in Paradox file,  array data length of fields in Paradox file
+#number of fields in Paradox file, code page for data in Paradox file, number of records in Paradox
+my ( $code_page, $num );
+# array data types of fields in Paradox file, array data length of fields in Paradox file,  array data length of fields in Paradox file
+my ( @type, @len, @name ); 
 
-unless ( $opts{'f'} ) {    # convert data to PGSQL
-
+unless ( $opts{'f'} ) {
+    # convert data to PGSQL
     $dbh = DBI->connect( "DBI:Pg:dbname=postgres", "$login", "$password" )
       or die("Could't connect to database: $DBI:: errstr");
     $dbh->do("drop database $basename");
@@ -32,13 +36,14 @@ unless ( $opts{'f'} ) {    # convert data to PGSQL
     $dbh = DBI->connect( "DBI:Pg:dbname=$basename", "$login", "$password" )
       or die("Could't connect to database: $DBI:: errstr");
 }
-else { open FILEOUT, "> $opts{'N'}" . '.sql' }    #convert data to file
-
-for my $f_table (@files) {                        # for every file in folder
+# convert data to file
+else { open FILEOUT, "> $opts{'N'}" . '.sql' }
+# for every file in folder
+for my $f_table (@files) {
 
     my $db = new Paradox "$f_table";
-    $code_page = $db->{code_page}
-      if $db->{code_page};    # get codepage for using in decode
+    # get codepage for using in decode
+    $code_page = $db->{code_page} if $db->{code_page};
     @type = @{ $db->{field_type} };
     @len  = @{ $db->{field_length} };
     @name = @{ $db->{field_name} };
@@ -65,8 +70,10 @@ for my $f_table (@files) {                        # for every file in folder
     else { print( FILEOUT "$sqlcommand\n" ); }
     print "Table $f_table created\n";
 
-    if ($num) {    # if table not empty
-        unless ( $opts{'f'} ) {    # copy in base
+    if ($num) {
+        # if table not empty
+        unless ( $opts{'f'} ) {
+            # copy in base
             $sqlcommand = "copy $f_table from stdin";
             $dbh->do($sqlcommand) or die $DBI::errstr;
 
@@ -74,8 +81,8 @@ for my $f_table (@files) {                        # for every file in folder
                 my @record_data = $db->fetch();
                 $sqlcommand = &convert_data( \@record_data );
                 $dbh->pg_putcopydata($sqlcommand);
-                if ( !( $j % $opts{'c'} ) and $j < $num )
-                {                  # copy $opts{'c'} records
+                if ( !( $j % $opts{'c'} ) and $j < $num ){
+                    # copy $opts{'c'} records
                     $dbh->pg_putcopyend();
                     $sqlcommand = "copy $f_table from stdin";
                     $dbh->do($sqlcommand) or die $DBI::errstr;
@@ -85,14 +92,15 @@ for my $f_table (@files) {                        # for every file in folder
             }
             $dbh->pg_putcopyend();
         }
-        else {                     #copy in file
+        else {
+            # copy in file
             my $buffer = '';
             for ( my $j = 1 ; $j <= $num ; $j++ ) {
                 my @record_data = $db->fetch();
                 $sqlcommand = &convert_data( \@record_data );
                 $buffer .= $sqlcommand;
-                if ( !( $j % $opts{'c'} ) and $j < $num )
-                {                  # copy $opts{'c'} records
+                if ( !( $j % $opts{'c'} ) and $j < $num ) {
+                    # copy $opts{'c'} records
                     print( FILEOUT "$buffer" );
                     print "$j records of $num from $f_table copied\n";
                     $buffer = '';
@@ -112,14 +120,16 @@ unless ( $opts{'f'} ) {
 }
 else { close(FILEOUT) }
 
-sub basename {    # get name of base
+sub basename {
+    # get name of base
     my $full_path = cwd;
     my @dirs      = split( /\//, $full_path );
     my $basename  = lc( $dirs[ scalar(@dirs) - 1 ] );
     return $basename;
 }
 
-sub getoptions {    # get options from command line
+sub getoptions {
+    # get options from command line
     getopts( 'd:m:n:l:p:c:N:f', \%opts );
     unless (%opts) {
         die "
@@ -138,12 +148,11 @@ sub getoptions {    # get options from command line
 
 }
 
-sub create_table {    # make command 'CREATE TABLE'
+sub create_table {
+    # make command 'CREATE TABLE'
     my $f_table    = shift;
     my $sqlcommand = [];
-	#my $sqlcommand = "CREATE TABLE $f_table (";
     for my $i ( 0 .. $#type ) {
-		#$sqlcommand .= '"' . $name[$i] . '" ';
         given ( $type[$i] ) {
             when (0x01) {push @$sqlcommand, "\"$name[$i]\" char($len[$i])"; break; }
             when (0x02) {push @$sqlcommand, "\"$name[$i]\" date";           break }
@@ -156,14 +165,12 @@ sub create_table {    # make command 'CREATE TABLE'
             when (0x16) {push @$sqlcommand, "\"$name[$i]\" integer";                break }
             when (0x10) {push @$sqlcommand, "\"$name[$i]\" bytea";                  break }
         }
-		#$sqlcommand .= ', ';
     }
-	#$sqlcommand = substr( $sqlcommand, 0, length($sqlcommand) - 2 );
-	#$sqlcommand .= ');';
     return "CREATE TABLE $f_table (" . join (', ',  @$sqlcommand) . ');';
 }
 
-sub convert_data {    # convert data to copy
+sub convert_data {
+    # convert data to copy
     my $record_data = shift;
     my $sqlcommand  = [];
     for my $i ( 0 .. $#type ) {
