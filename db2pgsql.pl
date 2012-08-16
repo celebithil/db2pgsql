@@ -137,7 +137,7 @@ sub getoptions {
     -l login\n
     -p password\n
     -n basename (if empty, basename =  name of current directory)\n
-    -d destination codepage (default cp1251)\n
+    -d destination codepage (default UTFf8)\n
     -f print sql commands in file (by default converting in base directly) \n
     -N name of output file (by default using basename)\n
     -c count of records for one time recording to base (default 10000)\n";
@@ -145,6 +145,7 @@ sub getoptions {
     $opts{'n'} //= &basename;
     $opts{'c'} //= 10000;
     $opts{'N'} //= $opts{'n'};
+    $opts{'d'} //= 'UTF8';
 
 }
 
